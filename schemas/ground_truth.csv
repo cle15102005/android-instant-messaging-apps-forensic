@@ -1,0 +1,20 @@
+step,timestamp_utc,actor,target_app,action_type,content_or_detail,expected_in_main_db,expected_deleted,expected_recovered_max,snapshot_name,notes
+1,2026-11-03T08:00:00Z,Account_A,WhatsApp,SEND_TEXT,"DIFO_WA_MSG_01: Hello from partner",1,0,0,,Plaintext message #1
+2,2026-11-03T08:02:00Z,Account_B,WhatsApp,SEND_TEXT,"DIFO_WA_MSG_02: Reply from AVD",1,0,0,,Plaintext message #2
+3,2026-11-03T08:05:00Z,Account_A,WhatsApp,SEND_IMAGE,"DIFO_WA_IMG_01.jpg",1,0,0,,Image attachment
+4,2026-11-03T08:08:00Z,Account_A,WhatsApp,VOICE_CALL,"Answered voice call (30s)",1,0,0,step_wa_populated,Answered call log
+5,2026-11-03T08:10:00Z,Account_B,WhatsApp,DELETE_FOR_ME,"Delete DIFO_WA_MSG_01 & DIFO_WA_IMG_01 locally",0,2,2,step_wa_delete_me,Check .trash and msgstore.db
+6,2026-11-03T08:12:00Z,Account_A,WhatsApp,DELETE_FOR_EVERYONE,"Revoke DIFO_WA_MSG_02",0,1,1,step_wa_delete_all,Check revoked message artifacts
+7,2026-11-03T08:20:00Z,Account_A,Telegram,SEND_TEXT,"DIFO_TG_MSG_01: Telegram test message",1,0,0,,Stored in messages_v2.data BLOB
+8,2026-11-03T08:22:00Z,Account_B,Telegram,SEND_IMAGE,"DIFO_TG_IMG_01.jpg",1,0,0,,Telegram image cache
+9,2026-11-03T08:25:00Z,Account_A,Telegram,VOICE_CALL,"Answered voice call (20s)",1,0,0,step_tg_populated,Telegram call entry
+10,2026-11-03T08:28:00Z,Account_B,Telegram,DELETE_FOR_ME,"Delete DIFO_TG_MSG_01 locally",0,1,1,step_tg_deleted,Compare with P01 persistence warning
+11,2026-11-03T08:40:00Z,Account_A,Zalo,SEND_TEXT,"DIFO_ZL_MSG_01: Xin chao Zalo",1,0,0,,Check chat_content table
+12,2026-11-03T08:42:00Z,Account_B,Zalo,SEND_IMAGE,"DIFO_ZL_IMG_01.jpg",1,0,0,,Check localpath column
+13,2026-11-03T08:45:00Z,Account_A,Zalo,VOICE_CALL,"Answered voice call (25s)",1,0,0,step_zl_populated,Zalo call artifact
+14,2026-11-03T08:48:00Z,Account_B,Zalo,DELETE_FOR_ME,"Delete DIFO_ZL_MSG_01 locally",0,1,1,step_zl_deleted,Check Zalo local deletion
+15,2026-11-03T09:00:00Z,Emu_Sender,SMS,RECEIVE_SMS,"DIFO_SMS_01 to DIFO_SMS_05 (5 incoming SMS via adb emu sms send)",5,0,0,step_sms_populated,5 incoming SMS in mmssms.db
+16,2026-11-03T09:02:00Z,Account_B,SMS,DELETE_IMMEDIATE,"TC1: Delete 2 SMS immediately before checkpoint",3,2,2,step_sms_tc1,High expected WAL recovery
+17,2026-11-03T09:10:00Z,Account_B,SMS,DELETE_AFTER_CHECKPOINT,"TC2: Force checkpoint/reboot then delete 2 SMS",1,2,2,step_sms_tc2,Test WAL overwrite behavior
+18,2026-11-03T09:15:00Z,Account_B,SMS,VACUUM_AFTER_DELETE,"TC3: Run SQLite VACUUM after deletion",1,2,0,step_sms_tc3,Expected 0% recovery after VACUUM
+19,2026-11-03T09:20:00Z,Emu_Caller,CallLog,GSM_CALL,"3 calls via adb emu gsm call/cancel (2 answered, 1 missed) then delete 2",1,2,2,step_call_tc1,Target calllog.db

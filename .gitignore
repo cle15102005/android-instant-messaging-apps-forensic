@@ -1,0 +1,50 @@
+# Forensic evidence & device dumps (NEVER commit raw PII or large dumps)
+dumps/
+evidence/
+working_copy/
+working_copy_*/
+*.ab
+*.tar
+*.tar.gz
+*.zip
+*.7z
+
+# SQLite databases & journals (except explicitly whitelisted in sample_data/)
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.crypt12
+*.crypt14
+*.crypt15
+!sample_data/**/*.db
+!sample_data/**/*.db-wal
+!sample_data/**/*.db-shm
+
+# APKs & binaries
+*.apk
+*.xapk
+*.apkm
+*.jar
+*.so
+frida-server*
+
+# Keys & sensitive configs
+*.key
+encrypted_backup.key
+local.properties
+.env
+
+# Python & IDE
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.idea/
+.vscode/
+~$*.xlsx
+~$*.docx
+.DS_Store
+Thumbs.db
