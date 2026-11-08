@@ -19,22 +19,35 @@ This document specifies how to recreate the controlled Android 11 Virtual Device
 
 ---
 
-## 2. Creating and Starting the `DiFo` AVD
+## 2. Creating and Starting the `DiFo` AVD (CLI-First on `D:\Android`)
 
-1. Open **Android Studio** → **Virtual Device Manager** → **Create Device**:
-   - **Hardware Profile:** Pixel 4
-   - **System Image:** Android 11.0 (R), API Level 30, ABI `x86_64`, Target `Google APIs`
-   - **AVD Name:** `DiFo`
-   - **RAM:** 4096 MB | **Internal Storage:** 8192 MB
-2. Launch the AVD and verify root privileges:
-   ```powershell
-   adb devices
-   adb root
-   adb shell id
-   # Expected output: uid=0(root) gid=0(root) contexts=u:r:su:s0
-   adb shell getprop ro.build.version.release
-   # Expected output: 11
-   ```
+To keep drive `C:` clean, all SDK packages, Portable JDK 17, and AVD disk images (`ANDROID_AVD_HOME`) are stored under `D:\Android`.
+
+### Automated One-Command Setup (Recommended)
+Run the automated PowerShell script from the repository root:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\cuong_extraction\setup_android_cli.ps1
+```
+This script automatically:
+1. Downloads Portable OpenJDK 17 to `D:\Android\jdk-17`
+2. Downloads Android Command-line Tools to `D:\Android\Sdk\cmdline-tools\latest`
+3. Sets `ANDROID_SDK_ROOT=D:\Android\Sdk` and `ANDROID_AVD_HOME=D:\Android\avd`
+4. Installs `platform-tools`, `emulator`, `build-tools;34.0.0`, `platforms;android-30`, and `system-images;android-30;google_apis;x86_64`
+5. Creates the `DiFo` AVD (`pixel_4`, 4096 MB RAM, 8192 MB storage) inside `D:\Android\avd\DiFo.avd`
+
+### Launching the AVD and Verifying Root
+```powershell
+# Start the emulator (keep this window open)
+D:\Android\Sdk\emulator\emulator.exe -avd DiFo -writable-system
+
+# In a second terminal, verify root privileges and Android version:
+adb devices
+adb root
+adb shell id
+# Expected output: uid=0(root) gid=0(root) contexts=u:r:su:s0
+adb shell getprop ro.build.version.release
+# Expected output: 11
+```
 
 ---
 
