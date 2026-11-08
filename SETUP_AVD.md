@@ -8,12 +8,12 @@ This document specifies how to recreate the controlled Android 11 Virtual Device
 
 | Component | Required Configuration | Verification Command (PowerShell) | Actual Pinned Value |
 |---|---|---|---|
-| Host OS | Windows 10/11 64-bit (WHPX enabled) | `winver` | *(fill during setup)* |
-| Android Studio | Latest Stable | `Help > About` | *(fill during setup)* |
-| SDK Platform-Tools (`adb`) | Latest | `adb version` | *(fill during setup)* |
-| Android Emulator | Latest | `emulator -version` | *(fill during setup)* |
-| SDK Build-Tools (`aapt`) | Latest | `sdkmanager --list_installed` | *(fill during setup)* |
-| System Image | `system-images;android-30;google_apis;x86_64` | `sdkmanager --list_installed` | Revision: *(fill)* |
+| Host OS | Windows 10/11 64-bit (WHPX enabled) | `winver` / `emulator -accel-check` | `Windows 10.0.26200` (`WHPX 10.0.26200 usable`) |
+| OpenJDK | JDK 17 LTS (Portable on `D:\Android\jdk-17`) | `java -version` | `OpenJDK 17.0.21.0.2+1-LTS` (Microsoft-15779939) |
+| SDK Platform-Tools (`adb`) | Latest | `adb version` | `1.0.41` (`Version 37.0.1-15733141`) |
+| Android Emulator | Latest | `emulator -version` | `37.2.13.0` (`build_id 16740729`) |
+| SDK Build-Tools (`aapt`) | `build-tools;34.0.0` | `sdkmanager --list_installed` | `34.0.0` |
+| System Image | `system-images;android-30;google_apis;x86_64` | `sdkmanager --list_installed` | `android-30;google_apis;x86_64` |
 
 > **Important:** Always select **Google APIs Intel x86 Atom_64 System Image** (API 30). Do **NOT** use the *Google Play* image because production Google Play images disable `adb root`.
 
@@ -61,9 +61,9 @@ Get-FileHash -Algorithm SHA256 .\apks\<filename>.apk
 
 | App | Package Name | `versionName` | `versionCode` | ABI | APK SHA-256 | Source URL | Telegram `LAYER` | `allowBackup` |
 |---|---|---|---|---|---|---|---|---|
-| **WhatsApp** | `com.whatsapp` | *(fill)* | *(fill)* | *(fill)* | *(fill)* | APKMirror | N/A | *(fill)* |
-| **Telegram** | `org.telegram.messenger` | *(fill)* | *(fill)* | *(fill)* | *(fill)* | APKMirror | *(fill)* | *(fill)* |
-| **Zalo** | `com.zing.zalo` | *(fill)* | *(fill)* | *(fill)* | *(fill)* | APKMirror | N/A | *(fill)* |
+| **WhatsApp** | `com.whatsapp` | `2.26.44.71` | `264407138` | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | `fdc09052adb72e97f42661dddd28d06ea19c3ca2a83b2967064a2169d4afef28` | `whatsapp.com/android` | N/A | `true` (`SystemBackupAgent` + `fullBackupContent` excludes DB) |
+| **Telegram** | `org.telegram.messenger.web` | `13.2.0` | `72809` | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | `2d1fe6650578aa4e3437c9e775a7e849837f604a7294c6bd66f971d6ba13470e` | `telegram.org/android` | *(fill)* | `true` (`BackupAgent` excludes `cache4.db`) |
+| **Zalo** | `com.zing.zalo` | `26.10.02` | `261002903` | `arm64-v8a`, `armeabi-v7a` (split APKs) | `20f9f4eb76393af3b2a73d6d483ad93b6f69703d645f362c79ddafe592cfacff` (`base.apk`) | APKMirror (`.apkm` `b4883ce3...`) | N/A | `false` (`0x0`, `ZaloBackupAgent`) |
 
 ---
 

@@ -53,9 +53,13 @@ done
 pull_and_verify "WhatsApp" "/data/data/com.whatsapp/files/key" "$OUT_DIR/whatsapp"
 
 echo "[*] Pulling Telegram databases (including WAL/SHM) and userconfing.xml..."
+TG_PKG="org.telegram.messenger"
+if adb shell "[ -d '/data/data/org.telegram.messenger.web' ]"; then
+    TG_PKG="org.telegram.messenger.web"
+fi
 for ext in "" "-wal" "-shm"; do
-    pull_and_verify "Telegram" "/data/data/org.telegram.messenger/files/cache4.db${ext}" "$OUT_DIR/telegram"
+    pull_and_verify "Telegram" "/data/data/${TG_PKG}/files/cache4.db${ext}" "$OUT_DIR/telegram"
 done
-pull_and_verify "Telegram" "/data/data/org.telegram.messenger/shared_prefs/userconfing.xml" "$OUT_DIR/telegram"
+pull_and_verify "Telegram" "/data/data/${TG_PKG}/shared_prefs/userconfing.xml" "$OUT_DIR/telegram"
 
 echo "[*] Done. Hashes appended to $HASH_CSV"
