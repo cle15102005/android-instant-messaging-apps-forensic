@@ -1,0 +1,4 @@
+mid,uid,read_state,send_state,date,out,ttl,media,table_source,date_utc,direction,constructor_hex,constructor_i32,parsed_text,all_tl_strings,note
+1,10001,3,0,1793694000,0,0,0,messages_v2,2026-11-03T08:20:00Z,INCOMING,0x38116ee0,940666592,DIFO_TG_MSG_01: Telegram test message,DIFO_TG_MSG_01: Telegram test message,TEXT_EXTRACTED
+2,10001,3,0,1793694120,1,0,1,messages_v2,2026-11-03T08:22:00Z,OUTGOING,0x38116ee0,940666592,DIFO_TG_IMG_01.jpg,DIFO_TG_IMG_01.jpg,TEXT_EXTRACTED
+3,10001,3,0,1793694300,0,0,0,messages_v2,2026-11-03T08:25:00Z,INCOMING,0x9e19a1f6,-1642487306,,,SERVICE_OR_MEDIA_CONSTRUCTOR

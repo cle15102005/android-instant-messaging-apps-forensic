@@ -1,0 +1,3 @@
+jid,number,display_name,wa_name,status,status_timestamp,is_whatsapp_user,status_timestamp_utc
+84900000001@s.whatsapp.net,+84900000001,Partner Account A,Alice Forensics,Available,1793692800000,1,2026-11-03T08:00:00Z
+84900000002@s.whatsapp.net,+84900000002,AVD Account B,Bob AVD,In Lab,1793692800000,1,2026-11-03T08:00:00Z

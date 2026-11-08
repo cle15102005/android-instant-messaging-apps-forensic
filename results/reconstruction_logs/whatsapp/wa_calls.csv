@@ -1,0 +1,2 @@
+call_id,peer_jid,from_me,timestamp,video_call,duration,call_result,timestamp_utc,direction
+1,84900000001@s.whatsapp.net,0,1793693280000,0,30,5,2026-11-03T08:08:00Z,INCOMING

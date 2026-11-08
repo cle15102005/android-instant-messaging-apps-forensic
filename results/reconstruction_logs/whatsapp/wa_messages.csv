@@ -1,0 +1,5 @@
+msg_id,chat_jid,sender_jid,from_me,timestamp,message_type,text_data,status,media_file_path,media_mime_type,media_size,timestamp_utc,direction,forensic_note
+1,84900000001@s.whatsapp.net,84900000001@s.whatsapp.net,0,1793692800000,0,DIFO_WA_MSG_01: Hello from partner,0,,,,2026-11-03T08:00:00Z,INCOMING,TEXT
+2,84900000001@s.whatsapp.net,84900000002@s.whatsapp.net,1,1793692920000,0,DIFO_WA_MSG_02: Reply from AVD,13,,,,2026-11-03T08:02:00Z,OUTGOING,TEXT
+3,84900000001@s.whatsapp.net,84900000001@s.whatsapp.net,0,1793693100000,1,DIFO_WA_IMG_01 caption,0,Media/WhatsApp Images/IMG-20261103-WA0001.jpg,image/jpeg,145920,2026-11-03T08:05:00Z,INCOMING,IMAGE
+4,84900000001@s.whatsapp.net,84900000001@s.whatsapp.net,0,1793693520000,15,,0,,,,2026-11-03T08:12:00Z,INCOMING,REVOKED_OR_DELETED_TOMBSTONE
