@@ -62,7 +62,7 @@ Get-FileHash -Algorithm SHA256 .\apks\<filename>.apk
 | App | Package Name | `versionName` | `versionCode` | ABI | APK SHA-256 | Source URL | Telegram `LAYER` | `allowBackup` |
 |---|---|---|---|---|---|---|---|---|
 | **WhatsApp** | `com.whatsapp` | `2.26.44.71` | `264407138` | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | `fdc09052adb72e97f42661dddd28d06ea19c3ca2a83b2967064a2169d4afef28` | `whatsapp.com/android` | N/A | `true` (`SystemBackupAgent` + `fullBackupContent` excludes DB) |
-| **Telegram** | `org.telegram.messenger.web` | `13.2.0` | `72809` | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | `2d1fe6650578aa4e3437c9e775a7e849837f604a7294c6bd66f971d6ba13470e` | `telegram.org/android` | *(fill)* | `true` (`BackupAgent` excludes `cache4.db`) |
+| **Telegram** | `org.telegram.messenger.web` | `13.2.0` | `72809` | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | `2d1fe6650578aa4e3437c9e775a7e849837f604a7294c6bd66f971d6ba13470e` | `telegram.org/android` | **`233`** (`TLRPC.LAYER`) | `true` (`BackupAgent` excludes `cache4.db`) |
 | **Zalo** | `com.zing.zalo` | `26.10.02` | `261002903` | `arm64-v8a`, `armeabi-v7a` (split APKs) | `20f9f4eb76393af3b2a73d6d483ad93b6f69703d645f362c79ddafe592cfacff` (`base.apk`) | APKMirror (`.apkm` `b4883ce3...`) | N/A | `false` (`0x0`, `ZaloBackupAgent`) |
 
 ---

@@ -44,8 +44,8 @@ docker run --rm im-forensics:latest python scripts/linh_recovery/sqlite_header_c
 
 | Member | Role | Target / Scope | Report Sections |
 |---|---|---|---|
-| **Cường** | Android Extraction & Reconstruction | WhatsApp (`msgstore.db`, `wa.db`) & Telegram (`cache4.db`, `messages_v2`) | Theory §2.1–2.2, Impl §4.1 |
+| **Cuong** | Android Extraction & Reconstruction | WhatsApp (`msgstore.db`, `wa.db`) & Telegram (`cache4.db`, `messages_v2`, TL Layer 233) | Theory §2.1–2.2, Impl §4.1 |
 | **Linh** | Deleted Data Recovery | `mmssms.db` & `calllog.db` (`WAL → Freelist`, `TC1–TC3`) | Theory §2.5, Impl §4.2 |
-| **Hải** | App Artifacts Analysis | Cache, `shared_prefs`, Media, `.trash`, Cross-app Timeline | Impl §4.3 |
-| **Huy** | Zalo Deep Dive (Novelty) | Zalo Android `v24.x` (`databases/zalo`, `<UID>/<chatID>.db`) | Theory §2.3, Impl §4.4 |
+| **Hai** | App Artifacts Analysis | Cache, `shared_prefs`, Media, `.trash`, Cross-app Timeline | Impl §4.3 |
+| **Huy** | Zalo Deep Dive (Novelty) | Zalo Android `v26.10.02` (`databases/zalo`, `<UID>/<chatID>.db`) | Theory §2.3, Impl §4.4 |
 | **All** | Report & Presentation | Literature Matrix (`P01–P13`), Comparison (§2.4), Docker & Slides | §1, §2.4, §3, §5 |

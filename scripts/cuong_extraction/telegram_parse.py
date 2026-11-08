@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Telegram cache4.db & messages_v2 TL Binary Parser (Task 1 - Cường)
+Telegram cache4.db & messages_v2 TL Binary Parser (Task 1 - Cuong)
+Target APK: org.telegram.messenger.web v13.2.0 (TLRPC.LAYER = 233)
 Reads Telegram's cache4.db in immutable read-only mode (?immutable=1) and parses:
   1. users table (extracting ID, name, username/phone from TL binary data)
   2. dialogs / chats tables

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WhatsApp Forensic Reconstruction Script (Task 1 - Cường)
+WhatsApp Forensic Reconstruction Script (Task 1 - Cuong)
 Reconstructs Contacts (from wa.db), Chat History, and Call Logs (from msgstore.db)
 using read-only URI mode (?immutable=1) to preserve WAL/SHM integrity.
 
