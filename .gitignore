@@ -37,6 +37,10 @@ encrypted_backup.key
 local.properties
 .env
 
+# Reference papers (never commit copyrighted PDFs to Git)
+docs/papers/
+*.pdf
+
 # Python & IDE
 __pycache__/
 *.py[cod]
@@ -48,3 +52,6 @@ venv/
 ~$*.docx
 .DS_Store
 Thumbs.db
+
+.vs/
+report_latex/
