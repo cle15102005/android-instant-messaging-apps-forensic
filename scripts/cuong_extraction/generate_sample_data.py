@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sanitized Sample Dataset Generator (Role 1 - Le Viet Cuong 20235586)
+Sanitized WhatsApp Sample Dataset Generator (Role 1 - Le Viet Cuong 20235586)
 Generates synthetic, realistic SQLite databases matching the schemas of:
   1. sample_data/whatsapp/wa.db        (wa_contacts)
   2. sample_data/whatsapp/msgstore.db  (jid, chat, message, message_media, call_log)
-  3. sample_data/telephony/mmssms.db   (sms table for header/recovery verification)
-  4. sample_data/telephony/calllog.db  (calls table for header/recovery verification)
 
 These sanitized databases allow every team member and the course instructor to verify
 all reconstruction and inspection scripts (including inside Docker) without exposing
 private phone numbers or requiring live SIM cards.
 """
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -55,6 +54,7 @@ def create_whatsapp_samples(wa_dir: Path):
     # 2. msgstore.db (modern schema: jid + chat + message + message_media + call_log)
     conn = sqlite3.connect(msgstore_db)
     conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA secure_delete=OFF;")
     conn.executescript("""
         CREATE TABLE jid (
             _id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,68 +116,12 @@ def create_whatsapp_samples(wa_dir: Path):
     conn.close()
 
 
-def create_telephony_samples(tel_dir: Path):
-    tel_dir.mkdir(parents=True, exist_ok=True)
-    mmssms_db = tel_dir / "mmssms.db"
-    calllog_db = tel_dir / "calllog.db"
-    for p in (mmssms_db, calllog_db):
-        if p.exists():
-            p.unlink()
-
-    conn = sqlite3.connect(mmssms_db)
-    conn.execute("PRAGMA journal_mode=DELETE;")
-    conn.execute("PRAGMA secure_delete=OFF;")
-    conn.execute("""
-        CREATE TABLE sms (
-            _id INTEGER PRIMARY KEY AUTOINCREMENT,
-            address TEXT,
-            date INTEGER,
-            read INTEGER,
-            type INTEGER,
-            body TEXT
-        )
-    """)
-    for i in range(1, 6):
-        conn.execute(
-            "INSERT INTO sms (address, date, read, type, body) VALUES (?, ?, 1, 1, ?)",
-            ("+84901234567", 1794213000000 + i * 1000, f"DIFO_SMS_0{i}: Controlled SMS test payload #{i}"),
-        )
-    conn.commit()
-    conn.execute("DELETE FROM sms WHERE _id IN (3, 5);")
-    conn.commit()
-    conn.close()
-
-    conn = sqlite3.connect(calllog_db)
-    conn.execute("PRAGMA journal_mode=DELETE;")
-    conn.execute("PRAGMA secure_delete=OFF;")
-    conn.execute("""
-        CREATE TABLE calls (
-            _id INTEGER PRIMARY KEY AUTOINCREMENT,
-            number TEXT,
-            date INTEGER,
-            duration INTEGER,
-            type INTEGER,
-            name TEXT
-        )
-    """)
-    conn.executemany(
-        "INSERT INTO calls (_id, number, date, duration, type, name) VALUES (?,?,?,?,?,?)",
-        [
-            (1, "+84901234567", 1794213150000, 48, 2, "Partner Lab A"),
-            (2, "+84909888777", 1794213350000, 95, 1, "Suspect Contact B (DELETED)"),
-            (3, "+84901234567", 1794213500000, 120, 1, "Partner Lab A"),
-        ],
-    )
-    conn.commit()
-    conn.execute("DELETE FROM calls WHERE _id = 2;")
-    conn.commit()
-    conn.close()
-
-
 def main():
+    tel_dir = BASE_DIR / "telephony"
+    if tel_dir.exists():
+        shutil.rmtree(tel_dir)
     create_whatsapp_samples(BASE_DIR / "whatsapp")
-    create_telephony_samples(BASE_DIR / "telephony")
-    print(f"[+] Sanitized sample SQLite databases created under {BASE_DIR}")
+    print(f"[+] Sanitized WhatsApp sample SQLite databases created under {BASE_DIR / 'whatsapp'}")
 
 
 if __name__ == "__main__":
