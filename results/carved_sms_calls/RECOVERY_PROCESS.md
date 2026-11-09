@@ -40,6 +40,20 @@ Cặp `.db` + `-wal` quan trọng: chỉ mở `.db` đơn lẻ có thể cho th�
 
 Mở WAL-aware trực tiếp trên file gốc là không phù hợp cho quy trình bảo toàn: SQLite có thể tạo/cập nhật file phối hợp hoặc checkpoint. Vì thế mọi phép đọc WAL-aware được thực hiện trên bản sao trong thư mục tạm; các bản sao tự dọn khi chương trình kết thúc.
 
+#### Vì sao một bản ghi đã xóa vẫn còn trong `.db`?
+
+WAL không phải bản sao đầy đủ của database. Nó là chuỗi các trang database đã được cập nhật. Khi ứng dụng xóa một hàng trong chế độ WAL, SQLite ghi phiên bản mới của trang có chứa hàng đó vào WAL. File `.db` chính có thể vẫn giữ nguyên phiên bản trang cũ cho đến khi checkpoint.
+
+Có thể hình dung `.db` là cuốn sổ đã lưu lần trước, còn WAL là tờ đính chính mới hơn. Nếu chỉ đọc cuốn sổ cũ, ta có thể nhìn thấy hàng trước khi xóa. SQLite bình thường ghép tờ đính chính và trả về trạng thái mới hơn, trong đó hàng không còn. So sánh hai cách đọc cho thấy **hàng nào còn trong snapshot nền nhưng bị loại khỏi trạng thái hiện hành**. Nội dung được lấy từ snapshot nền, không nhất thiết phải “đào” nguyên văn nội dung hàng trong WAL.
+
+Điều này cũng giải thích vì sao mở riêng `.db` bằng công cụ thông thường có thể gây hiểu nhầm: nhiều SQLite client tự động áp WAL và chỉ hiện trạng thái mới, khiến người phân tích tưởng hàng chưa từng có trong file chính. Tham số `immutable=1` được dùng có chủ đích để xem riêng snapshot nền; bản WAL-aware được mở riêng trên bản sao tạm để không đụng vào chứng cứ gốc.
+
+#### WAL gồm những gì?
+
+WAL có header chung rồi nhiều **frame**. Mỗi frame gồm metadata và một ảnh trang database có kích thước 4096 byte trong bộ chứng cứ này. Metadata cho biết trang số mấy được thay thế. Frame có dấu commit đánh dấu một nhóm cập nhật hoàn tất; các thay đổi chưa commit không được coi là trạng thái database hợp lệ. SQLite kiểm tra frame và áp các thay đổi hợp lệ theo đúng thứ tự, thay vì ghép bytes tùy tiện.
+
+Trong kết quả này, root page của bảng `message` là trang 98; WAL tin nhắn có các frame ghi trang 98 ở frame 21, 60, 75 và 98. WAL call-log chỉ có một frame: frame 1 ghi trang 4, cũng là root page của `call_log`, và frame đó là commit. Đây là dấu vết phù hợp với việc trang chứa các hàng đã được cập nhật. Việc kết luận một `_id` bị xóa vẫn dựa vào truy vấn đối chiếu qua SQLite trên hai snapshot, không chỉ dựa vào số frame.
+
 ### 3.2 Carving record từ trang B-tree SQLite
 
 SQLite chia DB thành các trang. Bảng dạng rowid thường có các trang lá B-tree; mỗi cell trên trang có thể mô tả một hàng bằng payload size, rowid, header và các giá trị cột. Header dùng SQLite varint và serial type để cho biết kiểu/độ dài từng giá trị. Carver đọc các cấu trúc này từ bytes, rồi kiểm tra hàng giải mã có đúng schema, `_id` và chuỗi nhận dạng mong đợi không.
@@ -49,6 +63,20 @@ SQLite chia DB thành các trang. Bảng dạng rowid thường có các trang l
 - Hai khái niệm không đồng nghĩa. Chỉ gọi là phục hồi từ freeblock nếu header trang thật sự dẫn tới freeblock chứa cell.
 
 Trong dump này, `call_id=4` được giải mã ở vùng unallocated của trang lá, còn freeblock head bằng 0. Vì vậy kết quả được mô tả chính xác là B-tree page carving, dù nhãn record mẫu có chữ `FREEBLOCK`.
+
+#### Vì sao bytes trong vùng trống có thể trở thành một hàng?
+
+Khi SQLite xóa một cell, nó cập nhật cấu trúc trang để cell đó không còn là hàng đang hoạt động. Tùy vị trí/kích thước cell và thao tác khác về sau, bytes cũ có thể bị ghi đè, được nối vào freeblock, hoặc còn nguyên trong vùng trang không còn được dùng. Việc “xóa hàng” vì vậy không đồng nghĩa với việc mọi bytes của hàng lập tức bị xóa sạch.
+
+Carving tìm dấu vết ở mức bytes, nhưng chỉ tìm chuỗi nhận diện là chưa đủ: chuỗi đó có thể xuất hiện ngẫu nhiên hoặc trong hàng khác. Để chấp nhận kết quả ở đây, các bytes xung quanh phải đồng thời:
+
+1. Nằm trong đúng trang lá của bảng `call_log`.
+2. Đọc được theo định dạng cell của SQLite: kích thước payload, rowid, header và đủ 21 serial type cho schema bảng.
+3. Có rowid `4` và giá trị cột `call_id` đúng `WA_CALL_DEL_FREEBLOCK_04`.
+4. Có các kiểu/độ dài dữ liệu hợp lệ; các trường số, text và NULL được giải mã đúng ranh giới payload.
+5. Phù hợp với quan hệ bảng `jid`: `jid_row_id=3` nối tới `84909888777@s.whatsapp.net`.
+
+Các kiểm tra chéo này làm cho việc chấp nhận record đáng tin hơn việc chỉ grep một chuỗi. Tuy nhiên, carving vẫn là phục hồi từ dấu vết còn lại: nó không tự chứng minh danh tính người dùng, ngữ cảnh đầy đủ, hay thời điểm xóa nếu dữ liệu nguồn không cung cấp điều đó.
 
 ## 4. Quy trình đã thực hiện
 
@@ -60,12 +88,14 @@ Trong dump này, `call_id=4` được giải mã ở vùng unallocated của tra
 6. Tính lại hash chứng cứ sau khi phân tích và so với hash trước khi chạy để xác nhận file gốc không bị thay đổi.
 7. Xuất dữ liệu cùng phương pháp, vị trí byte và cảnh báo hash vào JSON và file Markdown này.
 
+Mấu chốt của quy trình không phải là “SQLite tự undelete dữ liệu”, mà là sử dụng hai trạng thái khác nhau của chứng cứ: file DB nền vẫn giữ một số bytes cũ; WAL mô tả trạng thái mới hơn sau thao tác xóa. Với cuộc gọi số 4, trạng thái bảng không còn trỏ tới cell, nhưng payload của cell vẫn chưa bị ghi đè nên có thể giải mã trực tiếp.
+
 ## 5. Đối chiếu WAL và kết quả
 
 | Bản ghi | Chỉ đọc DB chính | Đọc bản sao có WAL | Kết luận |
 |---|---:|---:|---|
-| `msgstore.db` / `message._id=6` | có | không | Có ở DB chính, bị xóa khỏi trạng thái WAL-aware; khôi phục từ snapshot DB chính. |
-| `wa_calllog_dummy.db` / `call_log._id=2` | có | không | Có ở DB chính, bị xóa khỏi trạng thái WAL-aware; khôi phục từ snapshot DB chính. |
+| `msgstore.db` / `message._id=6` | có; hàng đầy đủ và text còn đọc được | không | Hàng còn trong trang DB nền, nhưng trạng thái có WAL không còn hàng `_id=6`; lấy giá trị từ snapshot nền và xác nhận xóa bằng phép so sánh. |
+| `wa_calllog_dummy.db` / `call_log._id=2` | có; hàng đầy đủ còn đọc được | không | Cùng cách: lấy hàng từ file DB nền, còn snapshot WAL-aware xác nhận call `_id=2` đã bị xóa khỏi trạng thái hiện hành. |
 
 WAL được phân tích theo header và frame. Một frame mang số trang DB; commit frame cho biết điểm kết thúc một nhóm thay đổi hoàn chỉnh. SQLite cũng đọc thành công các bản sao WAL-aware.
 
@@ -79,6 +109,8 @@ WAL `msgstore.db-wal` có 13 commit frame; `wa_calllog_dummy.db-wal` có 1 commi
 ## 6. Chi tiết từng bản ghi khôi phục
 
 ### Tin nhắn `_id=6`
+
+**Cách đọc kết quả:** `text_data` là nội dung tin nhắn. `_id=6` là khóa hàng; `chat_row_id=2` chỉ tới cuộc hội thoại trong database; `from_me=1` cho biết record được đánh dấu là tin nhắn gửi từ tài khoản trên thiết bị. `timestamp` là thời gian Unix epoch tính bằng mili giây. Các mã trạng thái/loại khác được giữ nguyên theo giá trị database, không tự gán nghĩa nghiệp vụ nếu chưa có tài liệu schema tương ứng.
 
 ```json
 {
@@ -111,33 +143,7 @@ WAL `msgstore.db-wal` có 13 commit frame; `wa_calllog_dummy.db-wal` có 1 commi
 
 ### Cuộc gọi `_id=2`
 
-```json
-{
-  "_id": 2,
-  "jid_row_id": 2,
-  "from_me": 0,
-  "call_id": "WA_CALL_DEL_WAL_02",
-  "transaction_id": 102,
-  "timestamp": 1794213800000,
-  "video_call": 0,
-  "duration": 142,
-  "call_result": 5,
-  "is_dnd_mode_on": 0,
-  "bytes_transferred": 894120,
-  "group_jid_row_id": 0,
-  "is_joinable_group_call": 0,
-  "call_creator_device_jid_row_id": 0,
-  "call_random_id": "rnd02",
-  "call_link_row_id": 0,
-  "call_type": 0,
-  "offer_silence_reason": 0,
-  "scheduled_id": null,
-  "telecom_uuid": "uuid-wa-02",
-  "terminated_by_device_switch": 0
-}
-```
-
-### Cuộc gọi `_id=2`
+**Cách đọc kết quả:** `from_me=0` cho biết cuộc gọi đến theo cờ lưu trong hàng; `jid_row_id=2` liên kết tới người liên hệ trong bảng `jid`. `timestamp` là epoch mili giây, `duration=142` là giá trị duration được lưu, còn `video_call=0` đánh dấu cuộc gọi thoại. `call_result=5` là mã enum của ứng dụng; báo cáo giữ mã thô vì chưa xác minh bảng diễn giải mã này.
 
 ```json
 {
@@ -176,6 +182,16 @@ WAL `msgstore.db-wal` có 13 commit frame; `wa_calllog_dummy.db-wal` có 1 commi
 Lưu ý về thuật ngữ: header trang hiện tại không có freeblock nào được liên kết (freeblock head bằng 0). Cell được giải mã nằm trong vùng chưa cấp phát giữa mảng cell pointer và cell content đang hoạt động, không nằm trong một freeblock được liên kết. Vì vậy kết quả được ghi là carving vùng chưa cấp phát của trang B-tree, không khẳng định có freeblock chain.
 
 Record được giải mã theo định dạng cell của SQLite table-leaf: payload size, rowid, record header, serial types và các giá trị. `_id` INTEGER PRIMARY KEY được khôi phục từ rowid; `peer_jid` được nối từ bảng `jid`.
+
+**Cách xác định vị trí:** SQLite dùng page size 4096 byte. Trang số 4 bắt đầu tại offset `(4 - 1) × 4096 = 12288` trong file. Cell bắt đầu tại offset 3811 bên trong trang, nên offset tuyệt đối là `12288 + 3811 = 16099`. Header trang ghi nhận 3 cell đang hoạt động, với cell pointer ở các offset 4027, 3956 và 3885; mảng con trỏ kết thúc tại offset 14, còn nội dung cell đang hoạt động bắt đầu tại offset 3885. Cell nghi vấn bắt đầu ở 3811 — sau mảng con trỏ nhưng trước ranh giới nội dung đang hoạt động — nên bytes nằm trong vùng chưa cấp phát theo cấu trúc trang hiện tại và không được pointer array liệt kê như một hàng đang hoạt động.
+
+Header trang có `freeblock head = 0`, nghĩa là không có freeblock nào được liên kết để lần theo. Do đó không thể gọi đây là “cell nằm trong freeblock”. Bản ghi còn sót vì bytes payload chưa bị ghi đè, dù cell pointer của nó đã không còn trong danh sách cell đang hoạt động. Cách phân loại chính xác là carving từ unallocated page space.
+
+**Cách giải mã bytes:** Cell bắt đầu bằng varint payload size `72` (`0x48`), tiếp theo varint rowid `4` (`0x04`). Record header bắt đầu bằng kích thước header `22` byte (`0x16`), gồm 1 byte kích thước header và 21 serial type — một type cho mỗi cột trong schema `call_log`. Còn lại 50 byte trong payload là dữ liệu cột. Serial type mô tả kiểu và số byte của từng giá trị: số nguyên, text hoặc NULL. Carver tuần tự đọc đúng độ dài để không nhầm ranh giới các cột; tổng phần header và dữ liệu phải khớp payload size 72. Tính cả hai varint mở đầu, cell chiếm 74 byte. Vì `_id` được khai báo `INTEGER PRIMARY KEY`, giá trị khóa là rowid `4`. Sau đó kết quả được kiểm tra thêm theo chuỗi `call_id` tại offset 3836 và nối `jid_row_id=3` qua bảng `jid`.
+
+Tóm lại, call `_id=4` không được lấy từ một truy vấn `SELECT` bình thường vì SQLite không còn coi nó là hàng hoạt động. Nó được khôi phục vì nội dung cell cũ vẫn còn ở trang 4 và bytes đó vượt qua kiểm tra cấu trúc/schema/rowid/chuỗi nhận diện.
+
+**Cách đọc kết quả:** `from_me=0` là cờ cuộc gọi đến; `duration=0` và `call_result=2` giữ nguyên giá trị lưu trong dump (không tự diễn giải mã kết quả); `video_call=0` đánh dấu thoại; `peer_jid` được nối từ bảng `jid`. Dùng các trường này như dữ liệu đã giải mã, không suy luận thêm ngoài schema đã biết.
 
 ```json
 {
