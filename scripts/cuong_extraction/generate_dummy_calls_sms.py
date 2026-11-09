@@ -178,6 +178,13 @@ def rebuild_hash_table():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     hash_csv = RESULTS_DIR / "hash_table.csv"
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    revalidation_rows = []
+    if hash_csv.exists():
+        with hash_csv.open(newline="", encoding="utf-8") as existing:
+            revalidation_rows = [
+                row for row in csv.DictReader(existing)
+                if row.get("Target_Role", "").endswith("_Revalidation")
+            ]
 
     tracked_files = [
         # Cuong (dumps/whatsapp/)
@@ -232,6 +239,17 @@ def rebuild_hash_table():
                 digest = sha256_file(path)
                 rel = path.relative_to(PROJECT_ROOT).as_posix()
                 writer.writerow([ts, role, path.name, rel, path.stat().st_size, digest, digest, "MATCH"])
+        for row in revalidation_rows:
+            writer.writerow([
+                row["Timestamp"],
+                row["Target_Role"],
+                row["Artifact_Name"],
+                row["Local_Relative_Path"],
+                row["File_Size_Bytes"],
+                row["SHA256_Pre_Acquisition"],
+                row["SHA256_Post_Acquisition"],
+                row["Integrity_Status"],
+            ])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,234 @@
+# Nhật ký khôi phục bản ghi WhatsApp — phần Linh
+
+- Thời điểm chạy (UTC): `2026-11-09T11:39:02.366573+00:00`
+- Thư mục chứng cứ: `C:\Documents\IT_documents\20261\Digital forensics\Project\for_linh`
+- Chứng cứ gốc được mở chỉ đọc; phép đọc WAL-aware chỉ chạy trên bản sao tạm.
+
+## 1. Nhiệm vụ được giao
+
+Tìm lại các bản ghi WhatsApp đã bị xóa khỏi trạng thái hiện hành:
+
+1. Tin nhắn `message._id=6` trong `msgstore.db`.
+2. Cuộc gọi `call_log._id=2` trong `wa_calllog_dummy.db`.
+3. Cuộc gọi nhỡ `call_log._id=4` từ dữ liệu SQLite còn sót trên trang B-tree.
+
+Mục tiêu là ghi lại dữ liệu, nguồn và vị trí khôi phục để người khác có thể kiểm tra lại. Không khôi phục hay ghi ngược vào database gốc, không làm báo cáo LaTeX trong bước này.
+
+## 2. Dump được giao: có gì và dùng để làm gì
+
+Thư mục `for_linh/` chứa các file liên quan đến cả WhatsApp và nhật ký SMS/cuộc gọi Android. Phạm vi bài của Linh là dữ liệu WhatsApp; `mmssms.db` và `calllog.db` không được dùng cho ba bản ghi dưới đây.
+
+| File | Nội dung / vai trò trong quá trình |
+|---|---|
+| `msgstore.db` | Database WhatsApp chính: bảng `message` có bản tin còn ở trang DB chính; dùng làm snapshot trước khi WAL áp dụng thao tác xóa. |
+| `msgstore.db-wal` | Nhật ký ghi trước (Write-Ahead Log) đi kèm DB tin nhắn; chứa các trang thay đổi mới hơn, SQLite dùng để dựng trạng thái hiện hành. |
+| `msgstore.db-shm` | File chia sẻ trạng thái/bộ nhớ phối hợp WAL; đi cùng DB khi mở bản sao WAL-aware. Không phải bản ghi tin nhắn độc lập. |
+| `wa_calllog_dummy.db` | DB bảng `jid` và `call_log`; chứa bản ghi gọi hiện hành và dữ liệu trang còn sót của cuộc gọi đã xóa. Tên `dummy` cho biết đây là DB call-log minh họa trong bộ dump. |
+| `wa_calllog_dummy.db-wal` | WAL của DB call-log; thể hiện trạng thái sau thao tác xóa `call_id=2`. |
+| `wa_calllog_dummy.db-shm` | Trạng thái phối hợp WAL cho DB call-log; dùng cùng DB/WAL trên bản sao tạm. |
+| `mmssms.db`, `calllog.db` | DB SMS/cuộc gọi hệ thống Android. Có mặt trong thư mục nhưng không được dùng vì nhiệm vụ này truy hồi message/call bên trong WhatsApp. |
+
+Cặp `.db` + `-wal` quan trọng: chỉ mở `.db` đơn lẻ có thể cho thấy một trạng thái cũ; ứng dụng SQLite bình thường ghép các frame WAL hợp lệ để hiển thị trạng thái mới nhất. File `-shm` hỗ trợ phối hợp WAL và được giữ nguyên trong bản sao để SQLite đọc cặp này theo cách thông thường.
+
+## 3. Phương pháp — giải thích trước khi xem kết quả
+
+### 3.1 So sánh snapshot DB chính với snapshot đã áp WAL
+
+- **Snapshot DB chính (`immutable=1`)**: mở file bằng SQLite ở chế độ chỉ đọc, đánh dấu immutable để SQLite không xử lý WAL bên cạnh. Điều này cho phép xem trạng thái đang nằm trong chính file `.db` mà không cập nhật nó.
+- **Snapshot WAL-aware (`mode=ro`)**: sao chép `.db`, `.db-wal`, `.db-shm` vào thư mục tạm rồi mở bản sao chỉ đọc, không đặt immutable. SQLite ghép những thay đổi đã commit trong WAL vào kết quả truy vấn.
+- Nếu một `_id` có trong snapshot DB chính nhưng không có trong snapshot WAL-aware, đó là bằng chứng bản ghi còn trong trạng thái nền nhưng đã bị xóa khỏi trạng thái logic mới hơn. Giá trị được lấy từ snapshot DB chính. Cách này không khẳng định WAL chứa nguyên văn nội dung đã xóa.
+
+Mở WAL-aware trực tiếp trên file gốc là không phù hợp cho quy trình bảo toàn: SQLite có thể tạo/cập nhật file phối hợp hoặc checkpoint. Vì thế mọi phép đọc WAL-aware được thực hiện trên bản sao trong thư mục tạm; các bản sao tự dọn khi chương trình kết thúc.
+
+### 3.2 Carving record từ trang B-tree SQLite
+
+SQLite chia DB thành các trang. Bảng dạng rowid thường có các trang lá B-tree; mỗi cell trên trang có thể mô tả một hàng bằng payload size, rowid, header và các giá trị cột. Header dùng SQLite varint và serial type để cho biết kiểu/độ dài từng giá trị. Carver đọc các cấu trúc này từ bytes, rồi kiểm tra hàng giải mã có đúng schema, `_id` và chuỗi nhận dạng mong đợi không.
+
+- **Freeblock** là đoạn trống được liên kết rõ ràng bằng con trỏ trong header trang sau khi xóa cell.
+- **Unallocated page space** là vùng chứa bytes chưa được cấu trúc trang hiện tại đánh dấu là cell đang sử dụng; dấu vết cũ đôi khi vẫn còn ở đó.
+- Hai khái niệm không đồng nghĩa. Chỉ gọi là phục hồi từ freeblock nếu header trang thật sự dẫn tới freeblock chứa cell.
+
+Trong dump này, `call_id=4` được giải mã ở vùng unallocated của trang lá, còn freeblock head bằng 0. Vì vậy kết quả được mô tả chính xác là B-tree page carving, dù nhãn record mẫu có chữ `FREEBLOCK`.
+
+## 4. Quy trình đã thực hiện
+
+1. Tính SHA-256 cho file dump hiện có và đối chiếu với manifest thu thập ban đầu.
+2. Đọc header thô để kiểm tra SQLite/WAL và page size; hai DB có page size 4096 byte, hai WAL có page size tương ứng 4096 byte.
+3. Mở `msgstore.db` và `wa_calllog_dummy.db` bằng immutable read-only; lấy `message._id=6` và `call_log._id=2` từ trạng thái DB chính.
+4. Tạo bản sao tạm gồm từng `.db`, `-wal`, `-shm`; mở bản sao theo WAL-aware read-only và xác nhận hai `_id` đó không còn trong trạng thái đã áp WAL.
+5. Phân tích root page của bảng `call_log`, tìm chuỗi nhận diện của `call_id=4`, thử giải mã cấu trúc cell theo schema 21 cột, rồi xác nhận rowid và toàn bộ payload hợp lệ.
+6. Tính lại hash chứng cứ sau khi phân tích và so với hash trước khi chạy để xác nhận file gốc không bị thay đổi.
+7. Xuất dữ liệu cùng phương pháp, vị trí byte và cảnh báo hash vào JSON và file Markdown này.
+
+## 5. Đối chiếu WAL và kết quả
+
+| Bản ghi | Chỉ đọc DB chính | Đọc bản sao có WAL | Kết luận |
+|---|---:|---:|---|
+| `msgstore.db` / `message._id=6` | có | không | Có ở DB chính, bị xóa khỏi trạng thái WAL-aware; khôi phục từ snapshot DB chính. |
+| `wa_calllog_dummy.db` / `call_log._id=2` | có | không | Có ở DB chính, bị xóa khỏi trạng thái WAL-aware; khôi phục từ snapshot DB chính. |
+
+WAL được phân tích theo header và frame. Một frame mang số trang DB; commit frame cho biết điểm kết thúc một nhóm thay đổi hoàn chỉnh. SQLite cũng đọc thành công các bản sao WAL-aware.
+
+| WAL | Kích thước | Page size | Số frame | Root page bảng / frame cập nhật |
+|---|---:|---:|---:|---|
+| `msgstore.db-wal` | 465592 B | 4096 B | 113 | 98 / 21, 60, 75, 98 |
+| `wa_calllog_dummy.db-wal` | 4152 B | 4096 B | 1 | 4 / 1 |
+
+WAL `msgstore.db-wal` có 13 commit frame; `wa_calllog_dummy.db-wal` có 1 commit frame. Root page là trang bắt đầu của bảng trong B-tree; số frame liệt kê là các frame chạm root page, không phải toàn bộ frame WAL.
+
+## 6. Chi tiết từng bản ghi khôi phục
+
+### Tin nhắn `_id=6`
+
+```json
+{
+  "_id": 6,
+  "chat_row_id": 2,
+  "from_me": 1,
+  "key_id": "ACDBDBF6A66CAD14468E248005ECA3CB",
+  "sender_jid_row_id": 0,
+  "status": 13,
+  "broadcast": 0,
+  "recipient_count": 0,
+  "participant_hash": null,
+  "origination_flags": 0,
+  "origin": 0,
+  "timestamp": 1794214023112,
+  "received_timestamp": 0,
+  "receipt_server_timestamp": -1,
+  "message_type": 0,
+  "text_data": "Delete this temporary access code: 849201",
+  "starred": 0,
+  "lookup_tables": 0,
+  "message_add_on_flags": 0,
+  "view_mode": 0,
+  "sort_id": 6,
+  "translated_text": null,
+  "view_replies_thread_id": null,
+  "server_sts": null
+}
+```
+
+### Cuộc gọi `_id=2`
+
+```json
+{
+  "_id": 2,
+  "jid_row_id": 2,
+  "from_me": 0,
+  "call_id": "WA_CALL_DEL_WAL_02",
+  "transaction_id": 102,
+  "timestamp": 1794213800000,
+  "video_call": 0,
+  "duration": 142,
+  "call_result": 5,
+  "is_dnd_mode_on": 0,
+  "bytes_transferred": 894120,
+  "group_jid_row_id": 0,
+  "is_joinable_group_call": 0,
+  "call_creator_device_jid_row_id": 0,
+  "call_random_id": "rnd02",
+  "call_link_row_id": 0,
+  "call_type": 0,
+  "offer_silence_reason": 0,
+  "scheduled_id": null,
+  "telecom_uuid": "uuid-wa-02",
+  "terminated_by_device_switch": 0
+}
+```
+
+### Cuộc gọi `_id=2`
+
+```json
+{
+  "_id": 2,
+  "jid_row_id": 2,
+  "from_me": 0,
+  "call_id": "WA_CALL_DEL_WAL_02",
+  "transaction_id": 102,
+  "timestamp": 1794213800000,
+  "video_call": 0,
+  "duration": 142,
+  "call_result": 5,
+  "is_dnd_mode_on": 0,
+  "bytes_transferred": 894120,
+  "group_jid_row_id": 0,
+  "is_joinable_group_call": 0,
+  "call_creator_device_jid_row_id": 0,
+  "call_random_id": "rnd02",
+  "call_link_row_id": 0,
+  "call_type": 0,
+  "offer_silence_reason": 0,
+  "scheduled_id": null,
+  "telecom_uuid": "uuid-wa-02",
+  "terminated_by_device_switch": 0
+}
+```
+
+### Carving cuộc gọi nhỡ `_id=4`
+
+- Bảng: `call_log`; root page: 4; loại trang: `0x0d` (table leaf).
+- Cell bắt đầu tại offset 3811 trong trang (offset 16099 trong file); payload 72 byte.
+- Chuỗi nhận diện `WA_CALL_DEL_FREEBLOCK_04` tại offset 3836 trong trang.
+- Freeblock head = 0; số freeblock liên kết = 0.
+- Phân loại vị trí cell: **`unallocated_page_space`**.
+
+Lưu ý về thuật ngữ: header trang hiện tại không có freeblock nào được liên kết (freeblock head bằng 0). Cell được giải mã nằm trong vùng chưa cấp phát giữa mảng cell pointer và cell content đang hoạt động, không nằm trong một freeblock được liên kết. Vì vậy kết quả được ghi là carving vùng chưa cấp phát của trang B-tree, không khẳng định có freeblock chain.
+
+Record được giải mã theo định dạng cell của SQLite table-leaf: payload size, rowid, record header, serial types và các giá trị. `_id` INTEGER PRIMARY KEY được khôi phục từ rowid; `peer_jid` được nối từ bảng `jid`.
+
+```json
+{
+  "artifact": "deleted_whatsapp_missed_call",
+  "record_id": 4,
+  "recovery_method": "sqlite_table_leaf_record_carving",
+  "source_file": "wa_calllog_dummy.db",
+  "source_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+  "evidence_location": {
+    "page_number": 4,
+    "cell_offset_in_page": 3811,
+    "cell_offset_in_file": 16099,
+    "cell_region": "unallocated_page_space"
+  },
+  "record": {
+    "_id": 4,
+    "jid_row_id": 3,
+    "from_me": 0,
+    "call_id": "WA_CALL_DEL_FREEBLOCK_04",
+    "transaction_id": 104,
+    "timestamp": 1794214150000,
+    "video_call": 0,
+    "duration": 0,
+    "call_result": 2,
+    "is_dnd_mode_on": 0,
+    "bytes_transferred": 12400,
+    "group_jid_row_id": 0,
+    "is_joinable_group_call": 0,
+    "call_creator_device_jid_row_id": 0,
+    "call_random_id": "rnd04",
+    "call_link_row_id": 0,
+    "call_type": 0,
+    "offer_silence_reason": 0,
+    "scheduled_id": null,
+    "telecom_uuid": "uuid-wa-04",
+    "terminated_by_device_switch": 0,
+    "peer_jid": "84909888777@s.whatsapp.net"
+  }
+}
+```
+
+## 7. Hash, giới hạn và file đầu ra
+
+| File | SHA-256 lúc thu thập (manifest gốc) | SHA-256 hiện tại | Revalidation bổ sung | Trạng thái so với lần thu thập |
+|---|---|---|---|---|
+| `msgstore.db` | `85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57` | `85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57` | `chưa có` (—) | **MATCH** |
+| `msgstore.db-wal` | `e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589` | `e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589` | `chưa có` (—) | **MATCH** |
+| `wa_calllog_dummy.db` | `ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05` | `ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05` | `chưa có` (—) | **MATCH** |
+| `wa_calllog_dummy.db-wal` | `ad8a38eff610717d43ec910beaee98749efd9d71071dec286b76992b5832860a` | `eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287` | `eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287` (MATCH) | **MISMATCH** |
+
+Hash SHA-256 là dấu vân tay của từng file: cùng bytes cho cùng hash; đổi dù một byte thường tạo hash khác. Bản ghi thu thập ban đầu được giữ nguyên. Với `wa_calllog_dummy.db-wal`, hash gốc trong manifest là `ad8a38eff610717d43ec910beaee98749efd9d71071dec286b76992b5832860a`, còn file hiện tại là `eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287`. Một dòng revalidation mới được thêm vào `results/hash_table.csv`; dòng đó ghi hash hiện tại mà không ghi đè lịch sử thu thập. Sai khác giữa hash lúc thu thập và hiện tại vẫn cần xác minh nguồn gốc; revalidation chỉ xác nhận giá trị hash của file tại thời điểm kiểm tra.
+
+Các file gốc không bị sửa. Kết quả là bản phân tích trên dump hiện có; sai khác hash làm giảm khả năng khẳng định WAL hiện tại giống hệt WAL tại thời điểm thu thập, nên cần nêu hạn chế này khi sử dụng kết quả.
+
+- `recovered_records.json`: metadata, hash, so sánh WAL và ba bản ghi.
+- `RECOVERY_PROCESS.md`: nhiệm vụ, mô tả dump, giải thích phương pháp, quy trình và kết quả chi tiết.
