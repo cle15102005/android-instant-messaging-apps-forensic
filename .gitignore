@@ -55,3 +55,6 @@ Thumbs.db
 
 .vs/
 report_latex/
+
+# Local recovery notes (keep out of Git)
+results/carved_sms_calls/RECOVERY_PROCESS.md
