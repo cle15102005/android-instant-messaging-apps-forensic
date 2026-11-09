@@ -1,0 +1,17 @@
+====================================================================
+STATIC ANDROIDMANIFEST.XML BACKUP SECURITY AUDIT (Role 1 - Cuong)
+====================================================================
+Target Device  : Android 11 (API 30) Google APIs x86_64 Rooted AVD (DiFo)
+Audit Tool     : apktool v2.9.3 / aapt2 dump xmltree
+Audit Date     : 2026-11-09
+
+1. Package: com.whatsapp (WhatsApp Messenger v2.26.44.71)
+   - android:allowBackup          : false
+   - android:backupAgent          : com.whatsapp.backup.google.GoogleBackupAgent
+   - android:fullBackupOnly       : false
+   - android:restoreAnyVersion    : true
+   - Unrooted `adb backup` Result : 47-byte empty `.ab` header (0 user databases extracted)
+   - Forensic Implication         : Standard logical backup via `adb backup -f whatsapp.ab com.whatsapp`
+                                    is blocked at the OS manifest level. Privileged root acquisition
+                                    (`adb root` / `su`) is strictly required to acquire `/data/data/com.whatsapp/`.
+====================================================================

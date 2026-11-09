@@ -4,4 +4,3 @@ msg_id,chat_jid,sender_jid,from_me,timestamp,message_type,text_data,status,media
 3,178774524043344@lid,,1,1794213821152,0,"Hi, did you finish checking the server logs for the incident?",13,,,,2026-11-09T08:43:41Z,OUTGOING,TEXT
 4,178774524043344@lid,,1,1794213838611,0,"Yes, I backed up the archive and exported the access records",13,,,,2026-11-09T08:43:58Z,OUTGOING,TEXT
 5,178774524043344@lid,,1,1794213997663,1,Here is the screenshot,13,Media/WhatsApp Images/Sent/IMG-20261109-WA0001.jpg,,22488,2026-11-09T08:46:37Z,OUTGOING,IMAGE
-6,178774524043344@lid,,1,1794214023112,0,Delete this temporary access code: 849201,13,,,,2026-11-09T08:47:03Z,OUTGOING,TEXT_RECOVERED_DELETED_IN_WAL
