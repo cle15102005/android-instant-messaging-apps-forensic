@@ -19,8 +19,11 @@ import argparse
 import csv
 import hashlib
 import re
+import shutil
 import sqlite3
 import struct
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +37,26 @@ def connect_readonly(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@contextmanager
+def connect_wal_merged_temp(db_path: Path):
+    """
+    Copies .db, .db-wal, and .db-shm into an isolated temporary directory so SQLite
+    can merge pending WAL frames without touching a single byte of the original evidence.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            candidate = db_path.parent / f"{db_path.name}{suffix}"
+            if candidate.exists():
+                shutil.copy2(candidate, tmp_path / candidate.name)
+        conn = sqlite3.connect(tmp_path / db_path.name)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 
 def sec_to_iso(ts_sec) -> str:
@@ -234,10 +257,9 @@ def main():
         return
 
     before_hash = sha256_file(cache4)
-    conn = connect_readonly(cache4)
-    parse_users(conn, out_dir / "tg_users.csv")
-    parse_messages(conn, out_dir / "tg_messages.csv")
-    conn.close()
+    with connect_wal_merged_temp(cache4) as conn:
+        parse_users(conn, out_dir / "tg_users.csv")
+        parse_messages(conn, out_dir / "tg_messages.csv")
     after_hash = sha256_file(cache4)
     assert before_hash == after_hash, "Integrity violation: cache4.db hash changed!"
     print(f"[+] SHA-256 integrity verified (unchanged): {after_hash}")

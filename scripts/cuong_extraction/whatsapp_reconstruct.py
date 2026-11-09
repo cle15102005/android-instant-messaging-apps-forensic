@@ -3,18 +3,24 @@
 """
 WhatsApp Forensic Reconstruction Script (Task 1 - Cuong)
 Reconstructs Contacts (from wa.db), Chat History, and Call Logs (from msgstore.db)
-using read-only URI mode (?immutable=1) to preserve WAL/SHM integrity.
+without modifying original evidence files (100% SHA-256 preserved).
 
-Supports both modern WhatsApp schemas (message / chat / jid / call_log tables)
-and legacy schemas (messages / chat_list).
+Performs dual-state WAL comparison on msgstore.db:
+  1. Active WAL-merged state (via an isolated temporary copy of .db + .db-wal + .db-shm)
+  2. Uncheckpointed main B-tree state (via ?immutable=1 on .db alone)
+Any message deleted recently in .db-wal prior to a WAL checkpoint remains present in
+the uncheckpointed main .db and is automatically flagged as RECOVERED_DELETED_IN_WAL.
 
 Usage:
-    python scripts/cuong_extraction/whatsapp_reconstruct.py --dump-dir ./dumps/whatsapp --out-dir ./results/whatsapp
+    python scripts/cuong_extraction/whatsapp_reconstruct.py --dump-dir ./dumps/whatsapp --out-dir ./results/reconstruction_logs/whatsapp
 """
 import argparse
 import csv
 import hashlib
+import shutil
 import sqlite3
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,11 +29,32 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def connect_readonly(db_path: Path) -> sqlite3.Connection:
+def connect_readonly_immutable(db_path: Path) -> sqlite3.Connection:
+    """Opens the main .db file with ?immutable=1 (ignores companion -wal file)."""
     uri = f"file:{db_path.resolve().as_posix()}?immutable=1"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@contextmanager
+def connect_wal_merged_temp(db_path: Path):
+    """
+    Copies .db, .db-wal, and .db-shm into an isolated temporary directory so SQLite
+    can merge pending WAL frames without touching a single byte of the original evidence.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            candidate = db_path.parent / f"{db_path.name}{suffix}"
+            if candidate.exists():
+                shutil.copy2(candidate, tmp_path / candidate.name)
+        conn = sqlite3.connect(tmp_path / db_path.name)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 
 def ms_to_iso(ts_ms) -> str:
@@ -51,21 +78,20 @@ def reconstruct_contacts(wa_db: Path, out_csv: Path) -> int:
         print(f"[-] {wa_db} not found, skipping contacts reconstruction.")
         return 0
 
-    conn = connect_readonly(wa_db)
     rows_out = []
-    if table_exists(conn, "wa_contacts"):
-        cols = [r["name"] for r in conn.execute("PRAGMA table_info(wa_contacts)").fetchall()]
-        select_cols = [
-            c for c in ("jid", "number", "display_name", "wa_name", "status", "status_timestamp", "is_whatsapp_user")
-            if c in cols
-        ]
-        query = f"SELECT {', '.join(select_cols)} FROM wa_contacts ORDER BY jid"
-        for r in conn.execute(query):
-            d = dict(r)
-            if "status_timestamp" in d:
-                d["status_timestamp_utc"] = ms_to_iso(d["status_timestamp"])
-            rows_out.append(d)
-    conn.close()
+    with connect_wal_merged_temp(wa_db) as conn:
+        if table_exists(conn, "wa_contacts"):
+            cols = [r["name"] for r in conn.execute("PRAGMA table_info(wa_contacts)").fetchall()]
+            select_cols = [
+                c for c in ("jid", "number", "display_name", "wa_name", "status", "status_timestamp", "is_whatsapp_user")
+                if c in cols
+            ]
+            query = f"SELECT {', '.join(select_cols)} FROM wa_contacts ORDER BY jid"
+            for r in conn.execute(query):
+                d = dict(r)
+                if "status_timestamp" in d:
+                    d["status_timestamp_utc"] = ms_to_iso(d["status_timestamp"])
+                rows_out.append(d)
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     if rows_out:
@@ -77,12 +103,10 @@ def reconstruct_contacts(wa_db: Path, out_csv: Path) -> int:
     return len(rows_out)
 
 
-def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
-    conn = connect_readonly(msgstore_db)
-    rows_out = []
-
+def _fetch_messages_from_conn(conn: sqlite3.Connection) -> dict:
+    """Returns dict mapping msg_id -> row dict."""
+    results = {}
     if table_exists(conn, "message") and table_exists(conn, "chat") and table_exists(conn, "jid"):
-        # Modern WhatsApp schema (message + chat + jid)
         has_media = table_exists(conn, "message_media")
         media_join = "LEFT JOIN message_media mm ON mm.message_row_id = m._id" if has_media else ""
         media_cols = ", mm.file_path AS media_file_path, mm.mime_type AS media_mime_type, mm.file_size AS media_size" if has_media else ""
@@ -102,13 +126,12 @@ def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
             LEFT JOIN jid chat_jid ON c.jid_row_id = chat_jid._id
             LEFT JOIN jid sender_jid ON m.sender_jid_row_id = sender_jid._id
             {media_join}
-            ORDER BY m.timestamp ASC
+            ORDER BY m.timestamp ASC, m._id ASC
         """
         for r in conn.execute(query):
             d = dict(r)
             d["timestamp_utc"] = ms_to_iso(d.get("timestamp"))
             d["direction"] = "OUTGOING" if d.get("from_me") == 1 else "INCOMING"
-            # message_type 15 or 64 often denotes revoked/deleted message Tombstones
             mtype = d.get("message_type")
             if mtype in (15, 64):
                 d["forensic_note"] = "REVOKED_OR_DELETED_TOMBSTONE"
@@ -118,9 +141,8 @@ def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
                 d["forensic_note"] = "TEXT"
             else:
                 d["forensic_note"] = f"TYPE_{mtype}"
-            rows_out.append(d)
+            results[d["msg_id"]] = d
     elif table_exists(conn, "messages"):
-        # Legacy WhatsApp schema
         query = """
             SELECT
                 _id AS msg_id,
@@ -134,15 +156,35 @@ def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
                 media_mime_type,
                 media_size
             FROM messages
-            ORDER BY timestamp ASC
+            ORDER BY timestamp ASC, _id ASC
         """
         for r in conn.execute(query):
             d = dict(r)
             d["timestamp_utc"] = ms_to_iso(d.get("timestamp"))
             d["direction"] = "OUTGOING" if d.get("from_me") == 1 else "INCOMING"
-            rows_out.append(d)
+            d["forensic_note"] = "LEGACY_TEXT"
+            results[d["msg_id"]] = d
+    return results
 
-    conn.close()
+
+def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
+    # 1. Read active WAL-merged state
+    with connect_wal_merged_temp(msgstore_db) as wal_conn:
+        active_msgs = _fetch_messages_from_conn(wal_conn)
+
+    # 2. Read uncheckpointed main DB state (?immutable=1) to catch rows deleted in WAL
+    imm_conn = connect_readonly_immutable(msgstore_db)
+    pre_ckpt_msgs = _fetch_messages_from_conn(imm_conn)
+    imm_conn.close()
+
+    # Merge both: rows present in pre_ckpt_msgs but missing in active_msgs were deleted in WAL!
+    combined = dict(active_msgs)
+    for msg_id, row in pre_ckpt_msgs.items():
+        if msg_id not in combined:
+            row["forensic_note"] = f"{row.get('forensic_note', 'TEXT')}_RECOVERED_DELETED_IN_WAL"
+            combined[msg_id] = row
+
+    rows_out = [combined[k] for k in sorted(combined.keys())]
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     if rows_out:
         with out_csv.open("w", newline="", encoding="utf-8") as f:
@@ -154,28 +196,27 @@ def reconstruct_messages(msgstore_db: Path, out_csv: Path) -> int:
 
 
 def reconstruct_calls(msgstore_db: Path, out_csv: Path) -> int:
-    conn = connect_readonly(msgstore_db)
     rows_out = []
-    if table_exists(conn, "call_log") and table_exists(conn, "jid"):
-        query = """
-            SELECT
-                cl._id AS call_id,
-                j.raw_string AS peer_jid,
-                cl.from_me,
-                cl.timestamp,
-                cl.video_call,
-                cl.duration,
-                cl.call_result
-            FROM call_log cl
-            LEFT JOIN jid j ON cl.jid_row_id = j._id
-            ORDER BY cl.timestamp ASC
-        """
-        for r in conn.execute(query):
-            d = dict(r)
-            d["timestamp_utc"] = ms_to_iso(d.get("timestamp"))
-            d["direction"] = "OUTGOING" if d.get("from_me") == 1 else "INCOMING"
-            rows_out.append(d)
-    conn.close()
+    with connect_wal_merged_temp(msgstore_db) as conn:
+        if table_exists(conn, "call_log") and table_exists(conn, "jid"):
+            query = """
+                SELECT
+                    cl._id AS call_id,
+                    j.raw_string AS peer_jid,
+                    cl.from_me,
+                    cl.timestamp,
+                    cl.video_call,
+                    cl.duration,
+                    cl.call_result
+                FROM call_log cl
+                LEFT JOIN jid j ON cl.jid_row_id = j._id
+                ORDER BY cl.timestamp ASC
+            """
+            for r in conn.execute(query):
+                d = dict(r)
+                d["timestamp_utc"] = ms_to_iso(d.get("timestamp"))
+                d["direction"] = "OUTGOING" if d.get("from_me") == 1 else "INCOMING"
+                rows_out.append(d)
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     if rows_out:
@@ -199,7 +240,7 @@ def main():
     wa_db = dump_dir / "wa.db"
 
     if not msgstore.exists():
-        print(f"[-] {msgstore} not found. Run extract_wa_tg.sh first.")
+        print(f"[-] {msgstore} not found. Run extract_wa_tg.ps1 first.")
         return
 
     before_hash = sha256_file(msgstore)
