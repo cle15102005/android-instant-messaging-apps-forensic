@@ -115,6 +115,10 @@ if (-not (Test-Path $AvdIni)) {
     Write-Host "=== [5/6] AVD '$AvdName' already exists at $AvdIni ===" -ForegroundColor Green
 }
 
+# Ensure emulator window fits standard laptop screens (fixes Windows DPI off-screen clipping)
+$EmulatorUserIni = "$AvdHome\$AvdName.avd\emulator-user.ini"
+Set-Content -Path $EmulatorUserIni -Value "window.x = 350`r`nwindow.y = 650`r`nwindow.scale = 0.350000`r`nresizable.config.id = -1`r`nposture = 0" -Encoding ASCII
+
 # 6. Print verification versions for SETUP_AVD.md
 Write-Host "`n=== [6/6] Setup Complete! Verification Summary (copy to SETUP_AVD.md) ===" -ForegroundColor Green
 Write-Host "JAVA_HOME        : $env:JAVA_HOME"
