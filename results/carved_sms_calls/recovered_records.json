@@ -1,0 +1,262 @@
+{
+  "generated_utc": "2026-11-09T11:39:02.366573+00:00",
+  "evidence_directory": "C:\\Documents\\IT_documents\\20261\\Digital forensics\\Project\\for_linh",
+  "evidence_hashes": [
+    {
+      "file": "msgstore.db",
+      "manifest_pre_sha256": "85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57",
+      "manifest_post_sha256": "85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57",
+      "acquisition_status": "MATCH",
+      "current_sha256": "85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57",
+      "status": "MATCH",
+      "revalidation_sha256": null,
+      "revalidation_status": null
+    },
+    {
+      "file": "msgstore.db-wal",
+      "manifest_pre_sha256": "e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589",
+      "manifest_post_sha256": "e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589",
+      "acquisition_status": "MATCH",
+      "current_sha256": "e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589",
+      "status": "MATCH",
+      "revalidation_sha256": null,
+      "revalidation_status": null
+    },
+    {
+      "file": "wa_calllog_dummy.db",
+      "manifest_pre_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+      "manifest_post_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+      "acquisition_status": "MATCH",
+      "current_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+      "status": "MATCH",
+      "revalidation_sha256": null,
+      "revalidation_status": null
+    },
+    {
+      "file": "wa_calllog_dummy.db-wal",
+      "manifest_pre_sha256": "ad8a38eff610717d43ec910beaee98749efd9d71071dec286b76992b5832860a",
+      "manifest_post_sha256": "ad8a38eff610717d43ec910beaee98749efd9d71071dec286b76992b5832860a",
+      "acquisition_status": "MATCH",
+      "current_sha256": "eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287",
+      "status": "MISMATCH",
+      "revalidation_sha256": "eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287",
+      "revalidation_status": "MATCH"
+    }
+  ],
+  "wal": {
+    "msgstore.db-wal": {
+      "sha256": "e77a9f0b21847170bd4836bf099df381f0e7e1210a0bcaddcc5bbb47afc94589",
+      "bytes": 465592,
+      "page_size": 4096,
+      "frame_count": 113,
+      "trailing_bytes": 0,
+      "distinct_pages": 33,
+      "target_page_numbers": [
+        98
+      ],
+      "target_page_frames": [
+        21,
+        60,
+        75,
+        98
+      ],
+      "commits": [
+        {
+          "frame": 4,
+          "database_pages": 681
+        },
+        {
+          "frame": 7,
+          "database_pages": 681
+        },
+        {
+          "frame": 13,
+          "database_pages": 681
+        },
+        {
+          "frame": 32,
+          "database_pages": 681
+        },
+        {
+          "frame": 37,
+          "database_pages": 681
+        },
+        {
+          "frame": 39,
+          "database_pages": 681
+        },
+        {
+          "frame": 48,
+          "database_pages": 681
+        },
+        {
+          "frame": 52,
+          "database_pages": 681
+        },
+        {
+          "frame": 57,
+          "database_pages": 681
+        },
+        {
+          "frame": 72,
+          "database_pages": 681
+        },
+        {
+          "frame": 85,
+          "database_pages": 681
+        },
+        {
+          "frame": 90,
+          "database_pages": 681
+        },
+        {
+          "frame": 113,
+          "database_pages": 681
+        }
+      ]
+    },
+    "wa_calllog_dummy.db-wal": {
+      "sha256": "eec6e9816f7d8f00a94a995fbbcece280f3701cffa31fa1e457eb24cde11e287",
+      "bytes": 4152,
+      "page_size": 4096,
+      "frame_count": 1,
+      "trailing_bytes": 0,
+      "distinct_pages": 1,
+      "target_page_numbers": [
+        4
+      ],
+      "target_page_frames": [
+        1
+      ],
+      "commits": [
+        {
+          "frame": 1,
+          "database_pages": 4
+        }
+      ]
+    }
+  },
+  "wal_comparison": {
+    "message_id_6_in_main_database": true,
+    "message_id_6_in_wal_merged_snapshot": false,
+    "call_id_2_in_main_database": true,
+    "call_id_2_in_wal_merged_snapshot": false
+  },
+  "call_id_4_carving": {
+    "root_page": 4,
+    "page_size": 4096,
+    "cell_offset_in_page": 3811,
+    "cell_offset_in_file": 16099,
+    "payload_size": 72,
+    "sentinel_offset_in_page": 3836,
+    "freeblock_head": 0,
+    "freeblocks": [],
+    "cell_region": "unallocated_page_space",
+    "cell_content_start": 3885,
+    "pointer_array_end": 14,
+    "page_type": 13,
+    "cell_count": 3
+  },
+  "recovered_records": [
+    {
+      "artifact": "deleted_whatsapp_message",
+      "record_id": 6,
+      "recovery_method": "immutable_main_database_vs_wal_merged_read_only_snapshot",
+      "source_file": "msgstore.db",
+      "source_sha256": "85bd6b0411fb74753899f45e71976f2a34618ea0032bf4fb042ab4ed49672b57",
+      "record": {
+        "_id": 6,
+        "chat_row_id": 2,
+        "from_me": 1,
+        "key_id": "ACDBDBF6A66CAD14468E248005ECA3CB",
+        "sender_jid_row_id": 0,
+        "status": 13,
+        "broadcast": 0,
+        "recipient_count": 0,
+        "participant_hash": null,
+        "origination_flags": 0,
+        "origin": 0,
+        "timestamp": 1794214023112,
+        "received_timestamp": 0,
+        "receipt_server_timestamp": -1,
+        "message_type": 0,
+        "text_data": "Delete this temporary access code: 849201",
+        "starred": 0,
+        "lookup_tables": 0,
+        "message_add_on_flags": 0,
+        "view_mode": 0,
+        "sort_id": 6,
+        "translated_text": null,
+        "view_replies_thread_id": null,
+        "server_sts": null
+      }
+    },
+    {
+      "artifact": "deleted_whatsapp_call",
+      "record_id": 2,
+      "recovery_method": "immutable_main_database_vs_wal_merged_read_only_snapshot",
+      "source_file": "wa_calllog_dummy.db",
+      "source_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+      "record": {
+        "_id": 2,
+        "jid_row_id": 2,
+        "from_me": 0,
+        "call_id": "WA_CALL_DEL_WAL_02",
+        "transaction_id": 102,
+        "timestamp": 1794213800000,
+        "video_call": 0,
+        "duration": 142,
+        "call_result": 5,
+        "is_dnd_mode_on": 0,
+        "bytes_transferred": 894120,
+        "group_jid_row_id": 0,
+        "is_joinable_group_call": 0,
+        "call_creator_device_jid_row_id": 0,
+        "call_random_id": "rnd02",
+        "call_link_row_id": 0,
+        "call_type": 0,
+        "offer_silence_reason": 0,
+        "scheduled_id": null,
+        "telecom_uuid": "uuid-wa-02",
+        "terminated_by_device_switch": 0
+      }
+    },
+    {
+      "artifact": "deleted_whatsapp_missed_call",
+      "record_id": 4,
+      "recovery_method": "sqlite_table_leaf_record_carving",
+      "source_file": "wa_calllog_dummy.db",
+      "source_sha256": "ad591a6c4b3e247c0e6a5cf2d5fefc2318bb860b993a07b67d0444c532fe8b05",
+      "evidence_location": {
+        "page_number": 4,
+        "cell_offset_in_page": 3811,
+        "cell_offset_in_file": 16099,
+        "cell_region": "unallocated_page_space"
+      },
+      "record": {
+        "_id": 4,
+        "jid_row_id": 3,
+        "from_me": 0,
+        "call_id": "WA_CALL_DEL_FREEBLOCK_04",
+        "transaction_id": 104,
+        "timestamp": 1794214150000,
+        "video_call": 0,
+        "duration": 0,
+        "call_result": 2,
+        "is_dnd_mode_on": 0,
+        "bytes_transferred": 12400,
+        "group_jid_row_id": 0,
+        "is_joinable_group_call": 0,
+        "call_creator_device_jid_row_id": 0,
+        "call_random_id": "rnd04",
+        "call_link_row_id": 0,
+        "call_type": 0,
+        "offer_silence_reason": 0,
+        "scheduled_id": null,
+        "telecom_uuid": "uuid-wa-04",
+        "terminated_by_device_switch": 0,
+        "peer_jid": "84909888777@s.whatsapp.net"
+      }
+    }
+  ]
+}
