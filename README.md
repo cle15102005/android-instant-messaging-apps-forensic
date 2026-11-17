@@ -10,7 +10,7 @@ University Digital Forensics Group Project (`ITE15` — HUST SOICT) investigatin
 | :--- | :---: | :--- | :--- | :--- | :---: |
 | **Le Viet Cuong** | `20235586` | **Role 1:** Testbed Setup, `allowBackup` Audit, Root Acquisition (SHA-256 Chain of Custody) & Active WhatsApp Chat/Contact/Call Reconstruction | `dumps/whatsapp/` | `results/reconstruction_logs/whatsapp/` & `results/hash_table.csv` | **COMPLETED (100%)** |
 | **Hoang Quoc Huy** | `20235594` | **Role 2:** Signal Protocol E2EE Database (`axolotl.db`), Local Backup Key (`files/key` 158B) & Auxiliary WhatsApp SQLite DBs (`status.db`, `stickers.db`, `chatsettings.db`, `companion_devices.db`, `media.db`, `sync.db`) | `dumps/for_huy/` | `results/reconstruction_logs/huy_crypto_dbs/` | **PENDING (Huy)** |
-| **Nguyen Ngoc Linh** | `20235599` | **Role 3:** Deleted WhatsApp Message & Call Log Recovery — Pre-Checkpoint WAL Comparison (`msgstore.db-wal`, `wa_calllog_dummy.db-wal`) & B-Tree Page Carving (`call_log` table) | `for_linh/` | `results/carved_sms_calls/` | **COMPLETED (Linh; WAL revalidation recorded)** |
+| **Nguyen Ngoc Linh** | `20235599` | **Role 3:** Deleted WhatsApp Message & Call Log Recovery — Pre-Checkpoint WAL Comparison (`msgstore.db-wal`, `wa_calllog_dummy.db-wal`) & B-Tree Leaf Page Carving (`call_log` table) | `dumps/for_linh/` (`for_linh/`) | `results/carved_sms_calls/` | **COMPLETED (100%)** |
 | **Dinh Ha Hai** | `20235589` | **Role 4:** Non-Database WhatsApp Artifacts (`shared_prefs/*.xml`, `cache/`, EXIF Stripping on Sent Media, `files/.trash/` Deletion Staging) & Unified Timeline Correlation | `dumps/for_hai/` | `results/timeline/` | **PENDING (Hai)** |
 
 ---
@@ -23,7 +23,7 @@ project/
 │   ├── IM_Forensics_Literature_Matrix.xlsx     # 7 WhatsApp & SQLite papers (W01-W07) + Methods Synthesis
 │   ├── IM_Forensics_Task_Plan_1Month.xlsx      # 4-member WhatsApp task breakdown & status tracking
 │   ├── IM_Forensics_Environment_Versions.xlsx  # Testbed & 18 WhatsApp SQLite DB inventory
-│   └── LAB_NOTES_AND_FINDINGS.md               # Empirical notes & handoff specifications
+│   └── LAB_NOTES_AND_FINDINGS.md               # Empirical notes & completed findings (Cuong & Linh)
 ├── scripts/
 │   ├── cuong_extraction/                       # [COMPLETED] Role 1 scripts (Cuong)
 │   │   ├── setup_android_cli.ps1               # Rooted Android 11 DiFo AVD setup
@@ -36,7 +36,7 @@ project/
 │   │   └── README_TODO.md                      # Instructions for axolotl.db, key & auxiliary DBs
 │   ├── linh_recovery/                          # [COMPLETED] Role 3 scripts (Linh)
 │   │   ├── sqlite_header_check.py              # 100-byte SQLite header inspector
-│   │   ├── recover_deleted_records.py          # Read-only WAL comparison & B-tree page carving
+│   │   ├── recover_deleted_records.py          # Read-only WAL comparison & B-tree leaf page carving
 │   │   └── README_TODO.md                      # Role 3 scope, method, and integrity caveat
 │   └── hai_artifacts/                          # [TODO] Role 4 scripts (Hai)
 │       └── README_TODO.md                      # Instructions for shared_prefs, EXIF, .trash & timeline
@@ -44,20 +44,19 @@ project/
 │   └── whatsapp/                               # Sanitized wa.db & msgstore.db
 └── results/
     ├── allowbackup_audit.txt                   # Static manifest backup audit output (Cuong)
-    ├── hash_table.csv                          # 29 SHA-256 chain-of-custody hashes (Cuong)
-    ├── carved_sms_calls/                       # Recovered records & Linh's detailed process log
+    ├── hash_table.csv                          # 30 SHA-256 chain-of-custody entries (Cuong & Linh)
+    ├── carved_sms_calls/                       # Recovered deleted records JSON (Linh - COMPLETED)
     ├── reconstruction_logs/
     │   ├── whatsapp/                           # Active wa_contacts.csv, wa_messages.csv, wa_calls.csv (Cuong)
     │   └── huy_crypto_dbs/                     # Output directory for Huy
-    ├── carved_sms_calls/                       # Output directory for Linh
     └── timeline/                               # Output directory for Hai
 ```
 
 ---
 
-## 3. Quick Start & Verification (Role 1 — Completed by Cuong)
+## 3. Quick Start & Verification (Roles 1 & 3 — Completed by Cuong & Linh)
 
-1. **Generate or refresh team raw WhatsApp evidence dumps and SHA-256 hash table:**
+1. **Generate or refresh team raw WhatsApp evidence dumps and SHA-256 hash table (Cuong):**
    ```powershell
    python scripts/cuong_extraction/generate_dummy_calls_sms.py
    ```
@@ -65,13 +64,13 @@ project/
    ```powershell
    python scripts/cuong_extraction/whatsapp_reconstruct.py --dump-dir ./dumps/whatsapp --out-dir ./results/reconstruction_logs/whatsapp
    ```
-3. **Inspect SQLite headers (Linh):**
+3. **Inspect SQLite 100-byte headers (Linh):**
    ```powershell
-   python scripts/linh_recovery/sqlite_header_check.py ./for_linh/msgstore.db
-   python scripts/linh_recovery/sqlite_header_check.py ./for_linh/wa_calllog_dummy.db
+   python scripts/linh_recovery/sqlite_header_check.py ./dumps/for_linh/msgstore.db
+   python scripts/linh_recovery/sqlite_header_check.py ./dumps/for_linh/wa_calllog_dummy.db
    ```
-4. **Reproduce Linh's read-only deleted-record recovery:**
+4. **Reproduce Linh's read-only deleted-record recovery (`message._id=6`, `call_log._id=2`, `call_log._id=4`):**
    ```powershell
    python scripts/linh_recovery/recover_deleted_records.py
    ```
-   Outputs are written to `results/carved_sms_calls/`. The detailed process log records a SHA-256 mismatch for `wa_calllog_dummy.db-wal`; the call `4` cell is in unallocated B-tree page space, not a linked freeblock.
+   Outputs are written to `results/carved_sms_calls/recovered_records.json` without modifying source evidence hashes.

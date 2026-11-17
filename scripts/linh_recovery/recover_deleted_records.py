@@ -15,7 +15,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_EVIDENCE_DIR = ROOT / "for_linh"
+DEFAULT_EVIDENCE_DIR = ROOT / "for_linh" if (ROOT / "for_linh").exists() else ROOT / "dumps" / "for_linh"
 DEFAULT_OUTPUT_DIR = ROOT / "results" / "carved_sms_calls"
 TARGET_TEXT = b"WA_CALL_DEL_FREEBLOCK_04"
 CALL_COLUMNS = (
